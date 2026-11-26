@@ -156,7 +156,9 @@ footer li a{color:var(--on-var);transition:color .2s}footer li a:hover{color:#ff
 .mitem:nth-child(even) .slot{aspect-ratio:4/4.6}
 @media(prefers-reduced-motion:reduce){.mtrack{animation:none}.marquee{overflow-x:auto;-webkit-mask:none;mask:none}}
 /* testimonials */
-.tgrid{display:grid;gap:1.25rem;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));margin-top:3rem}
+.tgrid{display:grid;gap:1.25rem;grid-template-columns:1fr;margin-top:3rem}
+@media(min-width:700px){.tgrid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1500px){.tgrid{grid-template-columns:repeat(4,1fr)}}
 .tcard{padding:2rem;display:flex;flex-direction:column;gap:1.5rem}
 .tcard .mark{font:400 3rem/.6 var(--serif);color:var(--dim)}
 .tcard blockquote{font:italic 400 1.1rem/1.7 var(--serif);color:var(--on)}
