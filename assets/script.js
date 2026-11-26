@@ -25,7 +25,11 @@
   var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   document.querySelectorAll('.hs-wrap').forEach(function(w){
     var t=w.querySelector('.hscroll'),p=w.querySelector('.hs-prev'),n=w.querySelector('.hs-next');
-    var auto=t.hasAttribute('data-auto')&&!reduce,half=0,pos=0,paused=false,idle=null,last=null,SPEED=28;
+    var auto=t.hasAttribute('data-auto')&&!reduce,half=0,pos=0,last=null,SPEED=28,RESUME=2500;
+    // pause state: the carousel only moves itself when nobody is touching/hovering/focusing it and no
+    // user-driven scroll (drag, iOS momentum glide, arrow/keyboard smooth-scroll) has happened for RESUME ms
+    var touching=false,hovering=false,kbFocus=false,quietAt=0,speed=0,lastSet=-1;
+    function poke(ms){quietAt=Math.max(quietAt,performance.now()+(ms||RESUME))}
     function step(){var c=t.querySelector('.cat');return c?c.offsetWidth+20:300}
     if(auto){
       var kids=[].slice.call(t.children);
@@ -34,22 +38,37 @@
     }
     function measure(){var c=t.children;if(auto&&c.length)half=c[c.length/2].offsetLeft-c[0].offsetLeft}
     function upd(){if(auto)return;p.disabled=t.scrollLeft<4;n.disabled=t.scrollLeft+t.clientWidth>=t.scrollWidth-4}
-    function hold(ms){paused=true;clearTimeout(idle);if(ms)idle=setTimeout(function(){pos=t.scrollLeft;paused=false},ms)}
-    p.addEventListener('click',function(){t.scrollBy({left:-step(),behavior:'smooth'});if(auto)hold(2500)});
-    n.addEventListener('click',function(){t.scrollBy({left:step(),behavior:'smooth'});if(auto)hold(2500)});
-    t.addEventListener('scroll',upd,{passive:true});window.addEventListener('resize',function(){measure();upd()});
-    t.addEventListener('keydown',function(e){if(e.key==='ArrowRight')t.scrollBy({left:step(),behavior:'smooth'});if(e.key==='ArrowLeft')t.scrollBy({left:-step(),behavior:'smooth'})});
+    p.addEventListener('click',function(){poke();t.scrollBy({left:-step(),behavior:'smooth'})});
+    n.addEventListener('click',function(){poke();t.scrollBy({left:step(),behavior:'smooth'})});
+    t.addEventListener('scroll',function(){
+      // any scroll we didn't write ourselves (finger, momentum glide, smooth arrow scroll) keeps it paused
+      if(auto&&Math.abs(t.scrollLeft-lastSet)>1.5)poke();
+      upd()},{passive:true});
+    window.addEventListener('resize',function(){measure();upd()});
+    t.addEventListener('keydown',function(e){if(e.key==='ArrowRight'){poke();t.scrollBy({left:step(),behavior:'smooth'})}if(e.key==='ArrowLeft'){poke();t.scrollBy({left:-step(),behavior:'smooth'})}});
     measure();upd();
     if(!auto)return;
-    ['mouseenter','focusin'].forEach(function(ev){w.addEventListener(ev,function(){hold(0)})});
-    ['mouseleave','focusout'].forEach(function(ev){w.addEventListener(ev,function(){hold(800)})});
-    ['touchstart','pointerdown','wheel'].forEach(function(ev){t.addEventListener(ev,function(){hold(2500)},{passive:true})});
+    // finger down = fully paused until it lifts (the old code started a 2.5s timer on touchstart, so a long
+    // drag or iOS momentum glide got fought by the auto-scroll -> flicker)
+    t.addEventListener('touchstart',function(){touching=true;poke()},{passive:true});
+    ['touchend','touchcancel'].forEach(function(ev){t.addEventListener(ev,function(){touching=false;poke()},{passive:true})});
+    t.addEventListener('wheel',function(){poke()},{passive:true});
+    // hover/focus pauses only for a real mouse / keyboard (iPhone fires fake mouseenter on tap, which froze it)
+    w.addEventListener('pointerenter',function(e){if(e.pointerType==='mouse')hovering=true});
+    w.addEventListener('pointerleave',function(e){if(e.pointerType==='mouse'){hovering=false;poke(800)}});
+    w.addEventListener('focusin',function(e){try{kbFocus=e.target.matches(':focus-visible')}catch(_){kbFocus=false}});
+    w.addEventListener('focusout',function(){kbFocus=false;poke(800)});
     var visible=true;if('IntersectionObserver' in window)new IntersectionObserver(function(es){visible=es[0].isIntersecting}).observe(w);
     function tick(ts){
       if(last===null)last=ts;var dt=Math.min(ts-last,64)/1000;last=ts;
-      if(!paused&&visible&&half){pos+=SPEED*dt;if(pos>=half)pos-=half;t.scrollLeft=pos}
-      else if(paused)pos=t.scrollLeft;
-      if(half&&t.scrollLeft>=half){t.scrollLeft-=half;pos=t.scrollLeft}
+      if(touching||hovering||kbFocus||performance.now()<quietAt||!visible||!half){
+        speed=0;pos=t.scrollLeft;            // hands off: never write scrollLeft while the user is in control
+      }else{
+        speed=Math.min(SPEED,speed+SPEED*dt/0.8); // ease back in over ~0.8s instead of snapping to full speed
+        pos+=speed*dt;
+        if(pos>=half)pos-=half;              // loop wrap happens only here, never under a finger
+        lastSet=pos;t.scrollLeft=pos;
+      }
       requestAnimationFrame(tick);
     }
     window.addEventListener('load',measure);requestAnimationFrame(tick);

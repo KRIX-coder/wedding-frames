@@ -125,6 +125,9 @@ footer li a{color:var(--on-var);transition:color .2s}footer li a:hover{color:#ff
 .hscroll::-webkit-scrollbar{display:none}
 .hscroll .cat{flex:0 0 min(78vw,340px);scroll-snap-align:start;scroll-margin-left:var(--m)}
 .hscroll .cat.rv{opacity:1;transform:none}
+/* Safari flickers backdrop-filter elements inside a scrolling container; over a plain black page the
+   blur is invisible anyway, so cards in the carousel use a flat tint instead */
+.hscroll .glass{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(255,255,255,.05)}
 .hscroll .cat:hover{transform:translateY(-6px)}
 
 /* rows with image */
@@ -145,7 +148,9 @@ footer li a{color:var(--on-var);transition:color .2s}footer li a:hover{color:#ff
 .marquee{overflow:hidden;margin-top:3rem;-webkit-mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
 .mtrack{display:flex;gap:1.25rem;width:max-content;animation:slide 105s linear infinite} /* 9 photos per loop: same speed as before */
 .marquee.rtl .mtrack{animation-direction:reverse}
-.marquee:hover .mtrack,.marquee:focus-within .mtrack,.marquee.paused .mtrack{animation-play-state:paused}
+.marquee.paused .mtrack{animation-play-state:paused}
+/* hover-pause only with a real mouse: iPhone keeps :hover stuck after a tap, so tap-to-resume never worked */
+@media(hover:hover){.marquee:hover .mtrack,.marquee:focus-within .mtrack{animation-play-state:paused}}
 .marquee{cursor:pointer;-webkit-tap-highlight-color:transparent}
 @keyframes slide{to{transform:translateX(calc(-50% - .625rem))}}
 .mitem{flex:0 0 auto;width:clamp(240px,26vw,380px);position:relative;border-radius:1rem;overflow:hidden;border:1px solid var(--line)}
